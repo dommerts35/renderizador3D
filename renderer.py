@@ -5,37 +5,28 @@ import math
 
 class Renderer3D:
     def __init__(self, width=800, height=600):
-        # Inicializar Pygame
+
         pygame.init()
         self.width = width
         self.height = height
         self.screen = pygame.display.set_mode((width, height), pygame.DOUBLEBUF | pygame.OPENGL)
         pygame.display.set_caption("Renderizador 3D con Iluminación Phong")
-        
-        # Inicializar ModernGL context
         self.ctx = moderngl.create_context()
         
-        # Configurar el viewport
         self.ctx.viewport = (0, 0, width, height)
-        
-        # Habilitar depth testing
         self.ctx.enable(moderngl.DEPTH_TEST)
         
-        # Variables para la cámara - FPS style
         self.camera_pos = np.array([0.0, 2.0, 8.0], dtype=np.float32)
         self.camera_front = np.array([0.0, 0.0, -1.0], dtype=np.float32)
         self.camera_up = np.array([0.0, 1.0, 0.0], dtype=np.float32)
         self.camera_right = np.array([1.0, 0.0, 0.0], dtype=np.float32)
         
-        # Variables de rotación de cámara
         self.yaw = -90.0
         self.pitch = 0.0
         
-        # Velocidades
         self.camera_speed = 0.1
         self.mouse_sensitivity = 0.1
         
-        # Estado de teclas
         self.keys_pressed = {
             pygame.K_w: False,
             pygame.K_s: False,
@@ -48,18 +39,15 @@ class Renderer3D:
             pygame.K_3: False
         }
         
-        # Configurar el mouse
         pygame.mouse.set_visible(False)
         pygame.event.set_grab(True)
         
-        # Variables de iluminación
         self.light_pos = np.array([3.0, 5.0, 2.0], dtype=np.float32)
         self.light_color = np.array([1.0, 1.0, 1.0], dtype=np.float32)
         self.ambient_strength = 0.2
         self.specular_strength = 0.5
         self.shininess = 32
         
-        # Materiales para objetos
         self.materials = {
             'cube': {
                 'ambient': np.array([1.0, 0.5, 0.31], dtype=np.float32),
@@ -78,24 +66,19 @@ class Renderer3D:
             }
         }
         
-        # Crear shaders y programas
         self.create_shaders()
         
-        # Crear geometría
         self.create_cube()
         self.create_pyramid()
         self.create_floor()
-        self.create_light_source()  # Esfera para representar la luz
+        self.create_light_source() 
         
-        # Variables para rotación de objetos
         self.rotation_x = 0.0
         self.rotation_y = 0.0
         
-        # Tiempo para animaciones
         self.time = 0.0
         
     def create_shaders(self):
-        # Vertex shader con normales
         vertex_shader = """
         #version 330 core
         
@@ -119,7 +102,6 @@ class Renderer3D:
         }
         """
         
-        # Fragment shader con iluminación Phong
         fragment_shader = """
         #version 330 core
         
@@ -140,34 +122,28 @@ class Renderer3D:
         uniform float shininess;
         
         void main() {
-            // Ambient
             vec3 ambient = ambientStrength * lightColor * materialAmbient;
             
-            // Diffuse
             vec3 norm = normalize(Normal);
             vec3 lightDir = normalize(lightPos - FragPos);
             float diff = max(dot(norm, lightDir), 0.0);
             vec3 diffuse = diff * lightColor * materialDiffuse;
             
-            // Specular
             vec3 viewDir = normalize(viewPos - FragPos);
             vec3 reflectDir = reflect(-lightDir, norm);
             float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
             vec3 specular = specularStrength * spec * lightColor * materialSpecular;
             
-            // Resultado final
             vec3 result = (ambient + diffuse + specular) * Color;
             out_color = vec4(result, 1.0);
         }
         """
         
-        # Compilar shaders y crear programa
         self.prog = self.ctx.program(
             vertex_shader=vertex_shader,
             fragment_shader=fragment_shader
         )
         
-        # Obtener referencias a las variables uniformes
         self.model_uniform = self.prog['model']
         self.view_uniform = self.prog['view']
         self.projection_uniform = self.prog['projection']
@@ -182,39 +158,32 @@ class Renderer3D:
         self.shininess_uniform = self.prog['shininess']
     
     def create_cube(self):
-        # Vértices del cubo con normales y colores
         vertices = [
-            # Front face
             -0.5, -0.5,  0.5,  0.0,  0.0,  1.0,  1.0, 0.0, 0.0,
              0.5, -0.5,  0.5,  0.0,  0.0,  1.0,  1.0, 0.0, 0.0,
              0.5,  0.5,  0.5,  0.0,  0.0,  1.0,  1.0, 0.0, 0.0,
             -0.5,  0.5,  0.5,  0.0,  0.0,  1.0,  1.0, 0.0, 0.0,
             
-            # Back face
             -0.5, -0.5, -0.5,  0.0,  0.0, -1.0,  0.0, 1.0, 0.0,
              0.5, -0.5, -0.5,  0.0,  0.0, -1.0,  0.0, 1.0, 0.0,
              0.5,  0.5, -0.5,  0.0,  0.0, -1.0,  0.0, 1.0, 0.0,
             -0.5,  0.5, -0.5,  0.0,  0.0, -1.0,  0.0, 1.0, 0.0,
             
-            # Left face
             -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,  0.0, 0.0, 1.0,
             -0.5, -0.5,  0.5, -1.0,  0.0,  0.0,  0.0, 0.0, 1.0,
             -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,  0.0, 0.0, 1.0,
             -0.5,  0.5, -0.5, -1.0,  0.0,  0.0,  0.0, 0.0, 1.0,
             
-            # Right face
              0.5, -0.5, -0.5,  1.0,  0.0,  0.0,  1.0, 1.0, 0.0,
              0.5, -0.5,  0.5,  1.0,  0.0,  0.0,  1.0, 1.0, 0.0,
              0.5,  0.5,  0.5,  1.0,  0.0,  0.0,  1.0, 1.0, 0.0,
              0.5,  0.5, -0.5,  1.0,  0.0,  0.0,  1.0, 1.0, 0.0,
             
-            # Top face
             -0.5,  0.5,  0.5,  0.0,  1.0,  0.0,  1.0, 0.0, 1.0,
              0.5,  0.5,  0.5,  0.0,  1.0,  0.0,  1.0, 0.0, 1.0,
              0.5,  0.5, -0.5,  0.0,  1.0,  0.0,  1.0, 0.0, 1.0,
             -0.5,  0.5, -0.5,  0.0,  1.0,  0.0,  1.0, 0.0, 1.0,
             
-            # Bottom face
             -0.5, -0.5,  0.5,  0.0, -1.0,  0.0,  0.0, 1.0, 1.0,
              0.5, -0.5,  0.5,  0.0, -1.0,  0.0,  0.0, 1.0, 1.0,
              0.5, -0.5, -0.5,  0.0, -1.0,  0.0,  0.0, 1.0, 1.0,
@@ -222,12 +191,12 @@ class Renderer3D:
         ]
         
         indices = [
-            0, 1, 2, 2, 3, 0,    # Front
-            4, 5, 6, 6, 7, 4,    # Back
-            8, 9, 10, 10, 11, 8, # Left
-            12, 13, 14, 14, 15, 12, # Right
-            16, 17, 18, 18, 19, 16, # Top
-            20, 21, 22, 22, 23, 20  # Bottom
+            0, 1, 2, 2, 3, 0,    
+            4, 5, 6, 6, 7, 4,    
+            8, 9, 10, 10, 11, 8, 
+            12, 13, 14, 14, 15, 12, 
+            16, 17, 18, 18, 19, 16, 
+            20, 21, 22, 22, 23, 20 
         ]
         
         vertices = np.array(vertices, dtype=np.float32)
@@ -247,31 +216,25 @@ class Renderer3D:
         self.cube_num_indices = len(indices)
     
     def create_pyramid(self):
-        # Vértices de la pirámide con normales
         vertices = [
-            # Base
             -1.0, -1.0, -1.0,  0.0, -1.0,  0.0,  0.0, 0.0, 1.0,
              1.0, -1.0, -1.0,  0.0, -1.0,  0.0,  0.0, 1.0, 0.0,
              0.0, -1.0,  1.0,  0.0, -1.0,  0.0,  1.0, 0.0, 0.0,
             
-            # Caras laterales (cada vértice repetido con su normal correspondiente)
-            # Cara 1
             -1.0, -1.0, -1.0,  -0.816, 0.333, -0.471,  0.0, 0.0, 1.0,
              0.0, -1.0,  1.0,  -0.816, 0.333, -0.471,  1.0, 0.0, 0.0,
              0.0,  1.0,  0.0,  -0.816, 0.333, -0.471,  1.0, 1.0, 0.0,
             
-            # Cara 2
              0.0, -1.0,  1.0,  0.0, 0.333, 0.943,  1.0, 0.0, 0.0,
              1.0, -1.0, -1.0,  0.0, 0.333, 0.943,  0.0, 1.0, 0.0,
              0.0,  1.0,  0.0,  0.0, 0.333, 0.943,  1.0, 1.0, 0.0,
             
-            # Cara 3
              1.0, -1.0, -1.0,  0.816, 0.333, -0.471,  0.0, 1.0, 0.0,
             -1.0, -1.0, -1.0,  0.816, 0.333, -0.471,  0.0, 0.0, 1.0,
              0.0,  1.0,  0.0,  0.816, 0.333, -0.471,  1.0, 1.0, 0.0,
         ]
         
-        indices = list(range(12))  # 12 vértices, 4 triángulos * 3 vértices
+        indices = list(range(12))
         
         vertices = np.array(vertices, dtype=np.float32)
         indices = np.array(indices, dtype=np.uint32)
@@ -316,7 +279,6 @@ class Renderer3D:
         self.floor_num_indices = len(indices)
     
     def create_light_source(self):
-        # Shader simple para la fuente de luz
         light_vertex_shader = """
         #version 330 core
         layout (location = 0) in vec3 in_position;
@@ -342,7 +304,6 @@ class Renderer3D:
             fragment_shader=light_fragment_shader
         )
         
-        # Esfera simple para la luz (usando un cubo pequeño)
         vertices = [
             -0.2, -0.2, -0.2,
              0.2, -0.2, -0.2,
@@ -422,7 +383,6 @@ class Renderer3D:
         if self.keys_pressed[pygame.K_LSHIFT]:
             self.camera_pos -= self.camera_up * velocity
         
-        # Controles para la luz
         if self.keys_pressed[pygame.K_1]:
             self.light_pos[0] += 0.1
         if self.keys_pressed[pygame.K_2]:
@@ -505,7 +465,6 @@ class Renderer3D:
         view = self.get_view_matrix()
         projection = self.get_projection_matrix()
         
-        # Renderizar objetos con iluminación
         self.view_uniform.write(view.T.astype('f4').tobytes())
         self.projection_uniform.write(projection.T.astype('f4').tobytes())
         self.view_pos_uniform.write(self.camera_pos.astype('f4').tobytes())
@@ -515,7 +474,6 @@ class Renderer3D:
         self.specular_strength_uniform.value = self.specular_strength
         self.shininess_uniform.value = self.shininess
         
-        # Renderizar suelo
         floor_model = self.get_model_matrix([0.0, 0.0, 0.0])
         self.model_uniform.write(floor_model.T.astype('f4').tobytes())
         self.material_ambient_uniform.write(self.materials['floor']['ambient'].astype('f4').tobytes())
@@ -523,7 +481,6 @@ class Renderer3D:
         self.material_specular_uniform.write(self.materials['floor']['specular'].astype('f4').tobytes())
         self.floor_vao.render()
         
-        # Renderizar cubo
         cube_model = self.get_model_matrix(
             [-2.0, 0.0, 0.0],
             self.rotation_x,
@@ -537,7 +494,6 @@ class Renderer3D:
         self.material_specular_uniform.write(self.materials['cube']['specular'].astype('f4').tobytes())
         self.cube_vao.render()
         
-        # Renderizar pirámide
         pyramid_model = self.get_model_matrix(
             [2.0, 0.0, 0.0],
             self.rotation_y * 0.7,
@@ -551,7 +507,6 @@ class Renderer3D:
         self.material_specular_uniform.write(self.materials['pyramid']['specular'].astype('f4').tobytes())
         self.pyramid_vao.render(moderngl.TRIANGLES, self.pyramid_num_indices)
         
-        # Renderizar fuente de luz
         self.light_view_uniform.write(view.T.astype('f4').tobytes())
         self.light_projection_uniform.write(projection.T.astype('f4').tobytes())
         self.light_color_uniform_light.write(self.light_color.astype('f4').tobytes())
@@ -570,8 +525,7 @@ class Renderer3D:
             current_time = pygame.time.get_ticks() / 1000.0
             delta_time = current_time - self.time
             self.time = current_time
-            
-            # Animar la luz
+
             self.light_pos[0] = 3.0 + math.sin(current_time) * 2.0
             self.light_pos[1] = 5.0 + math.cos(current_time * 0.5) * 1.0
             
@@ -600,7 +554,6 @@ class Renderer3D:
             
             self.render()
             
-            # Mostrar información
             pygame.display.set_caption(
                 f"Iluminación Phong | FPS: {clock.get_fps():.1f} | "
                 f"Pos: ({self.camera_pos[0]:.1f}, {self.camera_pos[1]:.1f}, {self.camera_pos[2]:.1f}) | "
@@ -614,4 +567,5 @@ class Renderer3D:
 
 if __name__ == "__main__":
     renderer = Renderer3D()
+
     renderer.run()
